@@ -1,0 +1,88 @@
+trigger numberOfContact on Contact (after INSERT, after UNDELETE, after DELETE) {
+    Set <Id> accIds = new Set <Id>();
+    List <Account> accList = new List <Account>();
+    if(Trigger.isInsert || Trigger.isUndelete){
+        for(Contact con:trigger.new){
+            accIds.add(con.accountID);
+        }
+    }
+    if(Trigger.isDelete){
+        for(Contact con:trigger.old){
+            accIds.add(con.accountID);
+        }
+    }
+    
+    for(Account acc:[SELECT Id,Name,Number_of_Contacts__c,(Select Id from Contacts) from Account where Id IN: accIds]){
+        Account accObj = new Account ();
+        accObj.Id = acc.Id;
+        accObj.Number_of_Contacts__c = acc.Contacts.size();
+        accList.add(accObj);
+    }
+    
+    UPDATE accList; 
+}
+
+
+```````````````````````````````````````````````````````
+
+<aura:application extends="force:slds">
+	<c:accountListData ></c:accountListData>
+</aura:application>
+```````````````````````````````````````````````````````
+<aura:component controller="ViewListOfAccountCtrl" implements="force:appHostable,flexipage:availableForAllPageTypes,flexipage:availableForRecordHome,force:hasRecordId,forceCommunity:availableForAllPageTypes,force:lightningQuickAction" access="global" >
+    <!-- attribute declaration -->
+    <aura:attribute name="listOfAccounts" type="List"/>
+    
+    <!-- hadlerMethod declaration -->
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}"/>
+    
+    <table class="slds-table slds-table_bordered slds-table_striped slds-table_cell-buffer slds-table_fixed-layout">
+        <thead>
+            <tr class="slds-text-heading_label">
+                <!-- <th scope="col"><div class="slds-truncate" title="ID">ID</div></th>-->
+                <th scope="col"><div class="slds-truncate" title="Name">Name</div></th>
+            </tr>
+        </thead>
+        <tbody >
+            <aura:iteration var="acc" items="{!v.listOfAccounts}">
+                <tr>
+                    <td>
+                        <div class="slds-truncate" title="{!acc.Name}">{!acc.Name}</div>
+                    </td>
+                </tr>
+            </aura:iteration>
+        </tbody>
+    </table>
+</aura:component>
+``````````````````````````````````````````````````
+({
+    doInit: function(component, event, helper) {
+        /* Server side controller calling logic. */
+        
+        /*<getListOfAccounts> is server side controller method, 
+         * which return list of 10 account records.*/
+         var action = component.get("c.getListOfAccounts");
+         
+         action.setCallback(this, function(response){
+             /<response.getState()> return response status as SUCCESS/ERROR/INCOMPLETE etc./
+             var state = response.getState();
+             /*If response from server side is <SUCCESS>, then we will set response (list of accouts)
+             under lightning attribute <listOfAccounts> (defined under ViewListOfAccount.cmp)/
+            if (state === "SUCCESS"){
+                var lstOfAcc = response.getReturnValue();
+                console.log("State === > "+lstOfAcc);
+                if(lstOfAcc != null)
+                    component.set("v.listOfAccounts", lstOfAcc);
+            }
+        });
+         
+         $A.enqueueAction(action);
+     }
+})
+```````````````````````````````````````
+public class ViewListOfAccountCtrl {
+    @AuraEnabled
+    public static List<Account> getListOfAccounts(){
+        return [SELECT Id, Name FROM Account order by createddate LIMIT 10];
+    }
+}
